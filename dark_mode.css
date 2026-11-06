@@ -1,0 +1,25 @@
+:root {
+  --bg: #0f172a;
+  --srf: #1e293b;
+  --txt: #f8fafc;
+  --mut: #94a3b8;
+  --blu: #3b82f6;
+  --yel: #facc15;
+  --glo: rgba(59,130,246,.4);
+  --brd: rgba(255,255,255,.1);
+  --gla: rgba(15,23,42,.7);
+  --inp-bg: rgba(255,255,255,.05);
+}
+
+body.light-mode {
+  --bg: #f5f6f8;
+  --srf: #ffffff;
+  --txt: #1e293b;
+  --mut: #64748b;
+  --blu: #2563eb;
+  --yel: #eab308;
+  --glo: rgba(37,99,235,.3);
+  --brd: rgba(0,0,0,.1);
+  --gla: rgba(255,255,255,.8);
+  --inp-bg: rgba(0,0,0,.04);
+}

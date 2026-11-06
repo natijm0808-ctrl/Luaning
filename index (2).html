@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Luaning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Fira+Code&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="luaning.css">
+<link rel="stylesheet" href="dark_mode.css">
+</head>
+<body>
+
+<header class="barra">
+  <div class="barra-topo">
+    <div class="topo-esq" id="btnHome">
+      <div class="logrox"><div class="olhos"><div class="olho"></div><div class="olho"></div></div><div class="bochecha b-e"></div><div class="bochecha b-d"></div></div>
+      <span class="logo-p">Luaning</span>
+    </div>
+    <div class="btn-box">
+      <button id="btnTema" title="Mudar Tema">🌙</button>
+      <button id="btnReader" title="Modo Leitura">📖</button>
+      <button id="btnRecarregar" title="Recarregar">⟳</button>
+      <button id="btnLuaTools" title="LuaTools">🛠️</button>
+    </div>
+  </div>
+</header>
+
+<div id="status" class="status oculto"></div>
+
+<main>
+  <section id="home" class="tela">
+    <h1>Luaning</h1>
+    <div class="home-pesq">
+      <span id="iconeTLS" style="position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 18px; z-index: 2; pointer-events: none; transition: color 0.3s;">🔒</span>
+      <input id="url" type="text" placeholder="Onde vamos hoje?" autocomplete="off" style="padding-left: 48px;">
+      <button id="btnIr">Ir</button>
+    </div>
+    <p class="lema">"Se o céu da web não nos atravessa, a gente atravessa ele"</p>
+  </section>
+
+  <section id="loading" class="tela oculto">
+    <div class="spin-box"><div class="spinner"></div><p id="loadingMsg">Buscando...</p></div>
+  </section>
+
+  <section id="site" class="tela oculto">
+    <iframe id="frame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+  </section>
+
+  <section id="telaErro" class="tela oculto">
+    <div class="ico">🛡️</div>
+    <h2>Site Bloqueado</h2>
+    <p>O site <b id="erroUrl"></b> bloqueou a extração. Abra no navegador padrão.</p>
+    <button id="btnAbrirFora">Abrir no Navegador</button>
+  </section>
+
+  <div id="luatools">
+    <div class="lt-header">
+      <div class="lt-titulo">🛠️ LuaTools</div>
+      <button id="btnFecharLuaTools">Fechar [X]</button>
+    </div>
+    <div class="lt-tabs">
+      <button class="ativo" id="tabHtml">Elements</button>
+      <button id="tabSources">Sources</button>
+      <button id="tabMedia">Media</button>
+      <button id="tabInfo">Network</button>
+      <button id="tabStorage">Storage</button>
+    </div>
+    <div class="lt-body">
+      <div class="lt-side oculto" id="sidebarSources">
+        <div class="file-item ativo" id="fileHtml">📄 index.html</div>
+        <div class="file-item" id="fileCss">🎨 styles.css</div>
+        <div class="file-item" id="fileJs">⚙️ script.js</div>
+      </div>
+      <div class="lt-conteudo" id="luatoolsConteudo">Nenhum site carregado.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+// TEMA
+const btnTema = document.getElementById("btnTema"), bodyEl = document.body;
+if (localStorage.getItem("luaning_tema") === "light") { bodyEl.classList.add("light-mode"); btnTema.textContent = "☀️"; }
+btnTema.addEventListener("click", () => { bodyEl.classList.toggle("light-mode"); btnTema.textContent = bodyEl.classList.contains("light-mode") ? "☀️" : "🌙"; localStorage.setItem("luaning_tema", bodyEl.classList.contains("light-mode") ? "light" : "dark"); });
+</script>
+
+<script>
+// LÓGICA PRINCIPAL
+const input=document.getElementById("url"),btnIr=document.getElementById("btnIr"),btnRecar=document.getElementById("btnRecarregar"),btnHome=document.getElementById("btnHome"),home=document.getElementById("home"),site=document.getElementById("site"),loading=document.getElementById("loading"),loadingMsg=document.getElementById("loadingMsg"),telaErro=document.getElementById("telaErro"),frame=document.getElementById("frame"),erroUrl=document.getElementById("erroUrl"),btnAbrirFora=document.getElementById("btnAbrirFora"),statusEl=document.getElementById("status"),btnLuaTools=document.getElementById("btnLuaTools"),luatools=document.getElementById("luatools"),btnFecharLuaTools=document.getElementById("btnFecharLuaTools"),luatoolsConteudo=document.getElementById("luatoolsConteudo"),btnReader=document.getElementById("btnReader");
+const tabHtml=document.getElementById("tabHtml"),tabSources=document.getElementById("tabSources"),tabMedia=document.getElementById("tabMedia"),tabInfo=document.getElementById("tabInfo"),tabStorage=document.getElementById("tabStorage"),sidebarSources=document.getElementById("sidebarSources"),fileHtml=document.getElementById("fileHtml"),fileCss=document.getElementById("fileCss"),fileJs=document.getElementById("fileJs");
+
+let historico=[],posicao=-1,urlAtual="",htmlOriginal="",cssExtraido="",jsExtraido="",imgsExtraidas="",infoSiteAtual={},arquivoAtualSelecionado="html";
+let htmlLimpoOriginal = "";
+let modoLeituraAtivo = false;
+
+const HTTP_HEADERS={"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8","Accept-Language":"pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7","Cache-Control":"no-cache","Pragma":"no-cache"};
+
+function mostrarTela(tela){[home,site,loading,telaErro].forEach(t=>t.classList.add("oculto"));tela.classList.remove("oculto")}
+function mostrarStatus(msg,tipo=""){statusEl.textContent=msg;statusEl.className="status "+tipo;statusEl.classList.remove("oculto");setTimeout(esconderStatus,4000)}
+function esconderStatus(){statusEl.classList.add("oculto")}
+function normalizar(url){if(!/^https?:\/\//i.test(url))url="https://"+url;return url}
+
+async function processarCodigo(html) {
+  htmlOriginal = html; cssExtraido = ""; jsExtraido = "";
+  const rCss = /<style[^>]*>([\s\S]*?)<\/style>/gi, rJs = /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi;
+  let mC; while ((mC = rCss.exec(html)) !== null) { cssExtraido += mC[1].trim() + "\n\n"; }
+  let mJ; while ((mJ = rJs.exec(html)) !== null) { if (mJ[1].trim()) { jsExtraido += mJ[1].trim() + "\n\n"; } }
+  
+  let htmlFinal = html;
+
+  if (window.CatchImage) {
+    const resImgs = window.CatchImage.processar(htmlFinal, urlAtual);
+    imgsExtraidas = resImgs.imgs;
+    htmlFinal = resImgs.htmlFinal;
+  }
+
+  if (window.CssInspector) {
+    loadingMsg.textContent = "Caçando estilos (CSS)...";
+    const resCss = await window.CssInspector.processar(htmlFinal, urlAtual);
+    cssExtraido += resCss.cssExtraido;
+    htmlFinal = resCss.htmlFinal;
+  }
+
+  if (!cssExtraido) cssExtraido = "/* Nenhum estilo */";
+  if (!jsExtraido) jsExtraido = "// Nenhum script";
+  
+  return htmlFinal;
+}
+
+async function abrirURL(url) {
+  url = normalizar(url); urlAtual = url; mostrarTela(loading); loadingMsg.textContent = "Tentando extrair..."; input.value = url;
+  
+  modoLeituraAtivo = false; 
+  btnReader.style.background = "var(--inp-bg)";
+
+  let htmlCode = null;
+  
+  try { const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { headers: HTTP_HEADERS }); const data = await res.json(); if (data.contents) htmlCode = data.contents; } catch (e) {}
+  if (!htmlCode) { try { loadingMsg.textContent = "Proxy 2..."; const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, { headers: HTTP_HEADERS }); if (res.ok) htmlCode = await res.text(); } catch (e) {} }
+  if (!htmlCode) { try { loadingMsg.textContent = "Modo Leitura..."; const res = await fetch(`https://r.jina.ai/${url}`, { headers: { ...HTTP_HEADERS, 'x-respond-with': 'html' } }); if (res.ok) htmlCode = await res.text(); } catch (e) {} }
+
+  if (htmlCode) {
+    infoSiteAtual = { url: url, tamanho: (new Blob([htmlCode]).size / 1024).toFixed(2) + " KB", requisicao: "Sucesso via Proxy" };
+    const htmlLimpo = await processarCodigo(htmlCode);
+    
+    htmlLimpoOriginal = htmlLimpo; 
+    frame.srcdoc = htmlLimpo; 
+    
+    mostrarTela(site); 
+    mostrarStatus("✅ Site carregado!", "ok");
+  } else {
+    frame.src = "about:blank"; erroUrl.textContent = url; htmlOriginal = "Nenhum código."; cssExtraido = ""; jsExtraido = ""; imgsExtraidas = ""; mostrarTela(telaErro);
+  }
+}
+
+// BOTÃO DE LEITURA MANUAL
+btnReader.addEventListener("click", () => {
+  if (!htmlLimpoOriginal) return; 
+  modoLeituraAtivo = !modoLeituraAtivo;
+
+  if (modoLeituraAtivo) {
+    if (window.ReaderMode) frame.srcdoc = window.ReaderMode.processar(htmlLimpoOriginal, urlAtual).htmlFinal;
+    btnReader.style.background = "#f59e0b"; 
+    mostrarStatus("📖 Modo Leitura ativado", "ok");
+  } else {
+    frame.srcdoc = htmlLimpoOriginal;
+    btnReader.style.background = "var(--inp-bg)"; 
+    mostrarStatus("🌐 Modo Site original", "ok");
+  }
+});
+
+function atualizarLuaTools(){
+  sidebarSources.classList.add("oculto");
+  if(tabHtml.classList.contains("ativo")){luatoolsConteudo.textContent=htmlOriginal||"Nenhum site."}
+  else if(tabSources.classList.contains("ativo")){sidebarSources.classList.remove("oculto");if(arquivoAtualSelecionado==="html")luatoolsConteudo.textContent=htmlOriginal||"Vazio.";if(arquivoAtualSelecionado==="css")luatoolsConteudo.textContent=cssExtraido||"Vazio.";if(arquivoAtualSelecionado==="js")luatoolsConteudo.textContent=jsExtraido||"Vazio."}
+  else if(tabMedia.classList.contains("ativo")){luatoolsConteudo.textContent=imgsExtraidas||"Nenhuma imagem encontrada."}
+  else if(tabInfo.classList.contains("ativo")){if(!infoSiteAtual.url)luatoolsConteudo.textContent="Sem info.";else luatoolsConteudo.textContent=`[ Network Info ]\nURL: ${infoSiteAtual.url}\nTamanho: ${infoSiteAtual.tamanho}\nStatus: ${infoSiteAtual.requisicao}\nMétodo: GET\n`}
+  else if(tabStorage.classList.contains("ativo")){
+    if (window.DomInspector) {
+      luatoolsConteudo.textContent = window.DomInspector.lerDados();
+    } else {
+      luatoolsConteudo.textContent = "DomInspector não carregado.";
+    }
+  }
+}
+
+btnLuaTools.addEventListener("click",()=>{luatools.classList.add("aberto");atualizarLuaTools()});
+btnFecharLuaTools.addEventListener("click",()=>{luatools.classList.remove("aberto")});
+
+tabHtml.addEventListener("click",()=>{tabHtml.classList.add("ativo");tabSources.classList.remove("ativo");tabMedia.classList.remove("ativo");tabInfo.classList.remove("ativo");tabStorage.classList.remove("ativo");atualizarLuaTools()});
+tabSources.addEventListener("click",()=>{tabSources.classList.add("ativo");tabHtml.classList.remove("ativo");tabMedia.classList.remove("ativo");tabInfo.classList.remove("ativo");tabStorage.classList.remove("ativo");atualizarLuaTools()});
+tabMedia.addEventListener("click",()=>{tabMedia.classList.add("ativo");tabHtml.classList.remove("ativo");tabSources.classList.remove("ativo");tabInfo.classList.remove("ativo");tabStorage.classList.remove("ativo");atualizarLuaTools()});
+tabInfo.addEventListener("click",()=>{tabInfo.classList.add("ativo");tabHtml.classList.remove("ativo");tabSources.classList.remove("ativo");tabMedia.classList.remove("ativo");tabStorage.classList.remove("ativo");atualizarLuaTools()});
+tabStorage.addEventListener("click",()=>{tabStorage.classList.add("ativo");tabHtml.classList.remove("ativo");tabSources.classList.remove("ativo");tabMedia.classList.remove("ativo");tabInfo.classList.remove("ativo");atualizarLuaTools()});
+
+fileHtml.addEventListener("click",()=>{arquivoAtualSelecionado="html";fileHtml.classList.add("ativo");fileCss.classList.remove("ativo");fileJs.classList.remove("ativo");atualizarLuaTools()});
+fileCss.addEventListener("click",()=>{arquivoAtualSelecionado="css";fileCss.classList.add("ativo");fileHtml.classList.remove("ativo");fileJs.classList.remove("ativo");atualizarLuaTools()});
+fileJs.addEventListener("click",()=>{arquivoAtualSelecionado="js";fileJs.classList.add("ativo");fileHtml.classList.remove("ativo");fileCss.classList.remove("ativo");atualizarLuaTools()});
+
+btnRecar.addEventListener("click",()=>{if(urlAtual)abrirURL(urlAtual)});
+btnAbrirFora.addEventListener("click",()=>{if(urlAtual)window.open(urlAtual,"_blank")});
+btnHome.addEventListener("click",()=>{mostrarTela(home);input.value="";luatools.classList.remove("aberto"); htmlLimpoOriginal = "";});
+</script>
+
+<!-- Scripts Modulares -->
+<script src="buscador.js"></script>
+<script src="catch_image.js"></script>
+<script src="cloudflare_is_a_shit.js"></script>
+<script src="css_inspector.js"></script>
+<script src="jina_model.js"></script>
+<script src="reader_mode.js"></script>
+<script src="dom_inspector.js"></script>
+<script src="fingerprint_spoofer.js"></script>
+<script src="login_bypass.js"></script>
+
+</body>
+</html>
